@@ -1,8 +1,11 @@
-module se.kth.databas2.databas2 {
+module se.kth.databas.databas {
     requires javafx.controls;
     requires javafx.fxml;
+    requires org.mongodb.driver.core;
+    requires org.mongodb.bson;
+    requires org.mongodb.driver.sync.client;
 
-
-    opens se.kth.databas2.databas2 to javafx.fxml;
-    exports se.kth.databas2.databas2;
+    opens se.kth.databas2 to javafx.fxml;
+    opens se.kth.databas2.model to javafx.base;
+    exports se.kth.databas2;
 }

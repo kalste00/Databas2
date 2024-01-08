@@ -1,11 +1,10 @@
-package se.kth.databas;
+package se.kth.databas2;
 
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
-
-import se.kth.databas.model.BooksDbImpl;
-import se.kth.databas.view.BooksPane;
+import se.kth.databas2.model.BooksDbImpl;
+import se.kth.databas2.view.BooksPane;
 
 /**
  * Application start up.

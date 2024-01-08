@@ -1,9 +1,9 @@
-package se.kth.databas.view;
+package se.kth.databas2.view;
 
-import se.kth.databas.model.Book;
-import se.kth.databas.model.BooksDbInterface;
-import se.kth.databas.model.Genre;
-import se.kth.databas.model.SearchMode;
+import se.kth.databas2.model.Book;
+import se.kth.databas2.model.BooksDbInterface;
+import se.kth.databas2.model.Genre;
+import se.kth.databas2.model.SearchMode;
 
 import java.util.ArrayList;
 import java.util.List;

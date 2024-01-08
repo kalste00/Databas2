@@ -1,6 +1,5 @@
-package se.kth.databas.model;
+package se.kth.databas2.model;
 
-import java.sql.SQLException;
 import java.util.List;
 
 /**

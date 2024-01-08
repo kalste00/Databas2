@@ -1,19 +1,17 @@
-package se.kth.databas.view;
+package se.kth.databas2.view;
 
 import javafx.scene.control.*;
-import javafx.scene.control.cell.TextFieldListCell;
 import javafx.scene.layout.GridPane;
 import javafx.util.Callback;
-import se.kth.databas.model.Author;
-import se.kth.databas.model.Book;
-import se.kth.databas.model.Genre;
+import se.kth.databas2.model.Author;
+import se.kth.databas2.model.Book;
+import se.kth.databas2.model.Genre;
 
 import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class Dialogs {
 

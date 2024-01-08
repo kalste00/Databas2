@@ -1,4 +1,4 @@
-package se.kth.databas.model;
+package se.kth.databas2.model;
 
 /**
  * Represents an author of a book.

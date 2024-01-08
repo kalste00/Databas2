@@ -1,4 +1,4 @@
-package se.kth.databas.model;
+package se.kth.databas2.model;
 
 import java.sql.Date;
 import java.util.ArrayList;

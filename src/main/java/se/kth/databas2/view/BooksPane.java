@@ -1,8 +1,4 @@
-package se.kth.databas.view;
-
-import java.sql.Date;
-import java.util.List;
-import java.util.Optional;
+package se.kth.databas2.view;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -15,14 +11,13 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import se.kth.databas.model.Book;
-import se.kth.databas.model.BooksDbImpl;
-import se.kth.databas.model.SearchMode;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.TextField;
+import se.kth.databas2.model.Book;
+import se.kth.databas2.model.BooksDbImpl;
+import se.kth.databas2.model.SearchMode;
+
+import java.sql.Date;
+import java.util.List;
+import java.util.Optional;
 
 import static javafx.scene.control.Alert.AlertType.WARNING;
 
