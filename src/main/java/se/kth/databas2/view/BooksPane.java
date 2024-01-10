@@ -15,7 +15,7 @@ import se.kth.databas2.model.Book;
 import se.kth.databas2.model.BooksDbImpl;
 import se.kth.databas2.model.SearchMode;
 
-import java.sql.Date;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 

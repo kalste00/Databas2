@@ -92,16 +92,12 @@ public class Controller {
     public void deleteBooks(Book bookToDelete) {
         new Thread(() -> {
             try {
-                if (booksDb.isConnected()) {
-                    if (bookToDelete != null) {
-                        booksDb.deleteBook(bookToDelete);
-                        List<Book> updatedBooks = booksDb.getAllBooks();
-                        Platform.runLater(() -> booksView.displayBooks(updatedBooks));
-                    } else {
-                        Platform.runLater(() -> booksView.showAlertAndWait("Select a book to remove.", WARNING));
-                    }
+                if (bookToDelete != null) {
+                    booksDb.deleteBook(bookToDelete);
+                    List<Book> updatedBooks = booksDb.getAllBooks();
+                    Platform.runLater(() -> booksView.displayBooks(updatedBooks));
                 } else {
-                    Platform.runLater(() -> booksView.showAlertAndWait("Not connected", ERROR));
+                    Platform.runLater(() -> booksView.showAlertAndWait("Select a book to remove.", WARNING));
                 }
             } catch (Exception e) {
                 Platform.runLater(() -> booksView.showAlertAndWait("Error removing item: " + e.getMessage(), ERROR));
@@ -112,20 +108,17 @@ public class Controller {
     public void addItem(Book newItem) {
         new Thread(() -> {
             try {
-                if (booksDb.isConnected()) {
-                    if (newItem != null && newItem.getGenre() != null) {
-                        booksDb.addBook(newItem);
-                        List<Book> updatedBooks = booksDb.getAllBooks();
-                        Platform.runLater(() -> booksView.displayBooks(updatedBooks));
-                        if (newItem.getGenre() == null) {
-                            newItem.setGenre(Genre.None);
-                        }
-                    } else {
-                        Platform.runLater(() -> booksView.showAlertAndWait("Enter book details to add.", WARNING));
+                if (newItem != null && newItem.getGenre() != null) {
+                    booksDb.addBook(newItem);
+                    List<Book> updatedBooks = booksDb.getAllBooks();
+                    Platform.runLater(() -> booksView.displayBooks(updatedBooks));
+                    if (newItem.getGenre() == null) {
+                        newItem.setGenre(Genre.None);
                     }
                 } else {
-                    Platform.runLater(() -> booksView.showAlertAndWait("Not connected", ERROR));
+                    Platform.runLater(() -> booksView.showAlertAndWait("Enter book details to add.", WARNING));
                 }
+
             } catch (Exception e) {
                 Platform.runLater(() -> booksView.showAlertAndWait("Error adding item: " + e.getMessage(), ERROR));
             }
@@ -136,17 +129,12 @@ public class Controller {
         new Thread(() -> {
             try {
                 updateSemaphore.acquire(); // Acquire the semaphore to ensure synchronization
-
-                if (booksDb.isConnected()) {
-                    if (updatedItem != null) {
-                        booksDb.updateBook(updatedItem);
-                        List<Book> updatedBooks = booksDb.getAllBooks();
-                        Platform.runLater(() -> booksView.displayBooks(updatedBooks));
-                    } else {
-                        Platform.runLater(() -> booksView.showAlertAndWait("Select a book to update.", WARNING));
-                    }
+                if (updatedItem != null) {
+                    booksDb.updateBook(updatedItem);
+                    List<Book> updatedBooks = booksDb.getAllBooks();
+                    Platform.runLater(() -> booksView.displayBooks(updatedBooks));
                 } else {
-                    Platform.runLater(() -> booksView.showAlertAndWait("Not connected", ERROR));
+                    Platform.runLater(() -> booksView.showAlertAndWait("Select a book to update.", WARNING));
                 }
             } catch (Exception e) {
                 Platform.runLater(() -> booksView.showAlertAndWait("Error updating item: " + e.getMessage(), ERROR));

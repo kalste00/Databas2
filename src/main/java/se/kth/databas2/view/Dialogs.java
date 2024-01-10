@@ -7,9 +7,9 @@ import se.kth.databas2.model.Author;
 import se.kth.databas2.model.Book;
 import se.kth.databas2.model.Genre;
 
-import java.sql.Date;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -101,11 +101,10 @@ public class Dialogs {
                     String title = titleField.getText();
                     String isbn = isbnField.getText();
                     LocalDate publishedDate = publishedDateField.getValue();
-                    // If the user doesn't enter a rating, set a default value
                     int rating = ratingField.getText().isEmpty() ? 0 : Integer.parseInt(ratingField.getText());
                     Genre selectedGenre = genreChoiceBox.getValue();
 
-                    Book book = new Book(title, isbn, Date.valueOf(publishedDate), selectedGenre, rating);
+                    Book book = new Book(title, isbn, publishedDate, selectedGenre, rating);
                     selectedAuthors.forEach(author -> book.addAuthor(new Author(author)));
                     return book;
                 } catch (NumberFormatException e) {
@@ -130,7 +129,7 @@ public class Dialogs {
         // Create and configure the title, isbn, publishDate, rating, and genre fields.
         TextField titleField = new TextField(book.getTitle());
         TextField isbnField = new TextField(book.getIsbn());  // Use the existing ISBN value here
-        DatePicker publishedDateField = new DatePicker(book.getPublishDate().toLocalDate());
+        DatePicker publishedDateField = new DatePicker(book.getPublishDate());
         TextField ratingField = new TextField(String.valueOf(book.getRating()));
         TextField authorsField = new TextField();
 
@@ -206,7 +205,7 @@ public class Dialogs {
                     // Set the new ISBN value in the existing book before returning it
                     book.setIsbn(isbn);
 
-                    Book updatedBook = new Book(book.getBookId(), title, isbn, Date.valueOf(publishedDate), selectedGenre, rating);
+                    Book updatedBook = new Book(book.getBookId(), title, isbn, publishedDate, selectedGenre, rating);
                     selectedAuthors.forEach(author -> updatedBook.addAuthor(new Author(author)));
                     return updatedBook;
                 } catch (NumberFormatException e) {

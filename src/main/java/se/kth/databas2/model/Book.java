@@ -1,7 +1,8 @@
 package se.kth.databas2.model;
 
-import java.sql.Date;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -14,13 +15,13 @@ public class Book {
     private int bookId;
     private String isbn;
     private String title;
-    private Date publishDate;
+    private LocalDate publishDate;
     private Genre genre;
     private int rating;
     private String storyLine = "";
     private List<Author> authors = new ArrayList<>();
 
-    public Book(int bookId, String title, String isbn, Date publishDate, Genre genre, int rating) {
+    public Book(int bookId, String title, String isbn, LocalDate publishDate, Genre genre, int rating) {
         this.bookId = bookId;
         this.title = title;
         this.isbn = isbn;
@@ -29,7 +30,7 @@ public class Book {
         this.rating = rating;
     }
 
-    public Book(String title, String isbn, Date publishDate, Genre genre, int rating) {
+    public Book(String title, String isbn, LocalDate publishDate, Genre genre, int rating) {
         this(-1, title, isbn, publishDate, genre, rating);
     }
 
@@ -41,7 +42,7 @@ public class Book {
 
     public String getIsbn() { return isbn; }
     public String getTitle() { return title; }
-    public Date getPublishDate() { return publishDate; }
+    public LocalDate getPublishDate() { return publishDate; }
     public String getStoryLine() { return storyLine; }
 
     public void setStoryLine(String storyLine) {
@@ -80,7 +81,7 @@ public class Book {
         this.title = title;
     }
 
-    public void setPublishDate(Date publishDate) {
+    public void setPublishDate(LocalDate publishDate) {
         this.publishDate = publishDate;
     }
 

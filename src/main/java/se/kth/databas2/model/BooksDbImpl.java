@@ -16,6 +16,7 @@ import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 import org.bson.conversions.Bson;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -44,10 +45,7 @@ public class BooksDbImpl implements BooksDbInterface {
     @Override
     public boolean connect(String databaseName) throws BooksDbException {
         try {
-            // Anslut till MongoDB-servern
             mongoClient = MongoClients.create("mongodb+srv://kallestenbjelke:Gaming123@kcdb.gt7n66h.mongodb.net/?retryWrites=true&w=majority");
-
-            // Välj den angivna databasen
             database = mongoClient.getDatabase(databaseName);
 
             System.out.println("Connected to MongoDB");
@@ -86,7 +84,7 @@ public class BooksDbImpl implements BooksDbInterface {
                 int bookId = bookDocument.getInteger("bookId");
                 String title = bookDocument.getString("title");
                 String isbn = bookDocument.getString("ISBN");
-                Date publishDate = bookDocument.getDate("publishDate");
+                LocalDate publishDate = LocalDate.parse(bookDocument.getString("publishDate"));
                 Genre genre = Genre.valueOf(bookDocument.getString("genre"));
                 int rating = bookDocument.getInteger("rating");
 
@@ -122,7 +120,7 @@ public class BooksDbImpl implements BooksDbInterface {
                 int bookId = bookDocument.getInteger("bookId");
                 String title = bookDocument.getString("title");
                 String isbn = bookDocument.getString("ISBN");
-                Date publishDate = bookDocument.getDate("publishDate");
+                LocalDate publishDate = LocalDate.parse(bookDocument.getString("publishDate"));
                 Genre genre = Genre.valueOf(bookDocument.getString("genre"));
                 int rating = bookDocument.getInteger("rating");
 
@@ -162,7 +160,7 @@ public class BooksDbImpl implements BooksDbInterface {
                 int bookId = bookDocument.getInteger("bookId");
                 String title = bookDocument.getString("title");
                 String isbn = bookDocument.getString("ISBN");
-                Date publishDate = bookDocument.getDate("publishDate");
+                LocalDate publishDate = LocalDate.parse(bookDocument.getString("publishDate"));
                 Genre genre = Genre.valueOf(bookDocument.getString("genre"));
                 int rating = bookDocument.getInteger("rating");
 
@@ -211,7 +209,7 @@ public class BooksDbImpl implements BooksDbInterface {
                 int bookId = doc.getInteger("_id");
                 String title = doc.getString("title");
                 String isbn = doc.getString("isbn");
-                Date publishDate = doc.getDate("publishDate");
+                LocalDate publishDate = LocalDate.parse(doc.getString("publishDate"));
                 String genreStr = doc.getString("genre");
                 int rating = doc.getInteger("rating");
 
@@ -247,7 +245,7 @@ public class BooksDbImpl implements BooksDbInterface {
         try {
             // Aggregation to join Book_Author and Author collections
             List<Bson> pipeline = Arrays.asList(
-                    match(eq("bookId", bookId)),
+                    //match(eq("bookId", bookId)),
                     lookup("Book_Author", "authorId", "authorId", "authors"),
                     unwind("$authors"),
                     replaceRoot("$authors")
@@ -417,7 +415,7 @@ public class BooksDbImpl implements BooksDbInterface {
                 }
 
                 // Update the authors
-                updateBookAuthors(book, book.getAuthors(), session);
+                updateBookAuthors(book, book.getAuthors());
 
                 // Commit the transaction
                 session.commitTransaction();
@@ -641,7 +639,7 @@ public class BooksDbImpl implements BooksDbInterface {
     private List<Integer> getDistinctAuthorIds() throws BooksDbException {
         List<Integer> distinctAuthorIds = new ArrayList<>();
         try {
-            MongoCursor<Document> cursor = database.getCollection("Book_Author")
+            MongoCursor<Integer> cursor = database.getCollection("Book_Author")
                     .distinct("authorId", Integer.class)
                     .iterator();
 
@@ -785,18 +783,4 @@ public class BooksDbImpl implements BooksDbInterface {
             throw new BooksDbException("Error checking author connections in Book_Author collection", e);
         }
     }
-
-
-    @Override
-    public boolean isConnected() {
-        try {
-            return mongoClient != null && mongoClient.getCluster().isConnected();
-        } catch (Exception e) {
-            // Handle the exception or log it
-            e.printStackTrace();
-            return false;
-        }
-    }
-
-
 }
