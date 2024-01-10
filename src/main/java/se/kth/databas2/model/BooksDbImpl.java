@@ -5,8 +5,18 @@
  */
 package se.kth.databas2.model;
 
+import com.mongodb.ConnectionString;
+import com.mongodb.MongoClientSettings;
+import com.mongodb.MongoException;
+import com.mongodb.ServerApi;
+import com.mongodb.ServerApiVersion;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
+import org.bson.codecs.configuration.CodecRegistry;
+import org.bson.codecs.pojo.PojoCodecProvider;
 
-import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,29 +30,36 @@ import java.util.List;
  */
 public class BooksDbImpl implements BooksDbInterface {
 
-    private Connection connection;
+
+
+    private MongoClient mongoClient;
+    private MongoDatabase database;
 
     @Override
-    public boolean connect(String database) throws BooksDbException {
+    public boolean connect(String databaseName) throws BooksDbException {
         try {
-            String connectionString = "jdbc:mysql://localhost:3306/" + database + "?user=root" + "&password=Gaming123";
-            connection = DriverManager.getConnection(connectionString);
-            connection.setAutoCommit(false);
-            System.out.println("Connected to the database");
+            // Anslut till MongoDB-servern
+            mongoClient = MongoClients.create("mongodb+srv://kallestenbjelke:Gaming123@kcdb.gt7n66h.mongodb.net/?retryWrites=true&w=majority");
+
+            // Välj den angivna databasen
+            database = mongoClient.getDatabase(databaseName);
+
+            System.out.println("Connected to MongoDB");
             return true;
-        } catch (SQLException e) {
-            throw new BooksDbException("Failed to connect to the database", e);
+        } catch (MongoException e) {
+            throw new BooksDbException("Failed to connect to MongoDB", e);
         }
     }
+
     @Override
     public void disconnect() throws BooksDbException {
         try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-                System.out.println("Disconnected from the database");
+            if (mongoClient != null) {
+                mongoClient.close();
+                System.out.println("Disconnected from MongoDB");
             }
-        } catch (SQLException e) {
-            throw new BooksDbException("Failed to disconnect from the database", e);
+        } catch (Exception e) {
+            throw new BooksDbException("Error while disconnecting from MongoDB", e);
         }
     }
 

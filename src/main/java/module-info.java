@@ -1,4 +1,4 @@
-module se.kth.databas.databas {
+module se.kth.databas2.databas2 {
     requires javafx.controls;
     requires javafx.fxml;
     requires org.mongodb.driver.core;
