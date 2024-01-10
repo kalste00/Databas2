@@ -1,5 +1,6 @@
 package se.kth.databas2.view;
 
+import javafx.application.Platform;
 import se.kth.databas2.model.Book;
 import se.kth.databas2.model.BooksDbInterface;
 import se.kth.databas2.model.Genre;
@@ -7,6 +8,7 @@ import se.kth.databas2.model.SearchMode;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Semaphore;
 
 import static javafx.scene.control.Alert.AlertType.*;
 
@@ -20,6 +22,8 @@ public class Controller {
 
     private final BooksPane booksView; // view
     private final BooksDbInterface booksDb; // model
+    private final Semaphore updateSemaphore = new Semaphore(1);
+
 
     public Controller(BooksDbInterface booksDb, BooksPane booksView) {
         this.booksDb = booksDb;
@@ -51,7 +55,7 @@ public class Controller {
                 booksView.displayBooks(result);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(); // Add proper logging or print statements for debugging
             booksView.showAlertAndWait("Database error.", ERROR);
         }
     }
@@ -86,49 +90,70 @@ public class Controller {
     }
 
     public void deleteBooks(Book bookToDelete) {
-        try {
-            if (bookToDelete != null) {
-                booksDb.deleteBook(bookToDelete);
-                List<Book> updatedBooks = booksDb.getAllBooks();
-                booksView.displayBooks(updatedBooks);
-            } else {
-                booksView.showAlertAndWait("Select a book to remove.", WARNING);
+        new Thread(() -> {
+            try {
+                if (booksDb.isConnected()) {
+                    if (bookToDelete != null) {
+                        booksDb.deleteBook(bookToDelete);
+                        List<Book> updatedBooks = booksDb.getAllBooks();
+                        Platform.runLater(() -> booksView.displayBooks(updatedBooks));
+                    } else {
+                        Platform.runLater(() -> booksView.showAlertAndWait("Select a book to remove.", WARNING));
+                    }
+                } else {
+                    Platform.runLater(() -> booksView.showAlertAndWait("Not connected", ERROR));
+                }
+            } catch (Exception e) {
+                Platform.runLater(() -> booksView.showAlertAndWait("Error removing item: " + e.getMessage(), ERROR));
             }
-        } catch (Exception e) {
-            booksView.showAlertAndWait("Error removing item: " + e.getMessage(), ERROR);
-        }
+        }).start();
     }
 
     public void addItem(Book newItem) {
-        try {
-            if (newItem != null && newItem.getGenre() != null) {
-                booksDb.addBook(newItem);
-                List<Book> updatedBooks = booksDb.getAllBooks();
-                booksView.displayBooks(updatedBooks);
-                if (newItem.getGenre() == null) {
-                    newItem.setGenre(Genre.None);
+        new Thread(() -> {
+            try {
+                if (booksDb.isConnected()) {
+                    if (newItem != null && newItem.getGenre() != null) {
+                        booksDb.addBook(newItem);
+                        List<Book> updatedBooks = booksDb.getAllBooks();
+                        Platform.runLater(() -> booksView.displayBooks(updatedBooks));
+                        if (newItem.getGenre() == null) {
+                            newItem.setGenre(Genre.None);
+                        }
+                    } else {
+                        Platform.runLater(() -> booksView.showAlertAndWait("Enter book details to add.", WARNING));
+                    }
+                } else {
+                    Platform.runLater(() -> booksView.showAlertAndWait("Not connected", ERROR));
                 }
-            } else {
-                booksView.showAlertAndWait("Enter book details to add.", WARNING);
+            } catch (Exception e) {
+                Platform.runLater(() -> booksView.showAlertAndWait("Error adding item: " + e.getMessage(), ERROR));
             }
-        } catch (Exception e) {
-            booksView.showAlertAndWait("Error adding item: " + e.getMessage(), ERROR);
-        }
+        }).start();
     }
 
     public void updateItem(Book updatedItem) {
-        try {
-            if (updatedItem != null) {
-                booksDb.updateBook(updatedItem);
-                List<Book> updatedBooks = booksDb.getAllBooks();
-                booksView.displayBooks(updatedBooks);
-            } else {
-                booksView.showAlertAndWait("Select a book to update.", WARNING);
+        new Thread(() -> {
+            try {
+                updateSemaphore.acquire(); // Acquire the semaphore to ensure synchronization
+
+                if (booksDb.isConnected()) {
+                    if (updatedItem != null) {
+                        booksDb.updateBook(updatedItem);
+                        List<Book> updatedBooks = booksDb.getAllBooks();
+                        Platform.runLater(() -> booksView.displayBooks(updatedBooks));
+                    } else {
+                        Platform.runLater(() -> booksView.showAlertAndWait("Select a book to update.", WARNING));
+                    }
+                } else {
+                    Platform.runLater(() -> booksView.showAlertAndWait("Not connected", ERROR));
+                }
+            } catch (Exception e) {
+                Platform.runLater(() -> booksView.showAlertAndWait("Error updating item: " + e.getMessage(), ERROR));
+            } finally {
+                updateSemaphore.release(); // Release the semaphore
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            booksView.showAlertAndWait("Error updating item: " + e.getMessage(), ERROR);
-        }
+        }).start();
     }
     // TODO:
     // Add methods for all types of user interaction (e.g., via menus).

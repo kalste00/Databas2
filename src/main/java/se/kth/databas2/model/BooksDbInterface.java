@@ -12,11 +12,11 @@ import java.util.List;
  * by the underlying driver, wrap in a BooksDbException and then re-throw the latter
  * exception. This way the interface is the same for both implementations, because the
  * exception type in the method signatures is the same. More info in BooksDbException.java.
- * 
+ *
  * @author anderslm@kth.se
  */
 public interface BooksDbInterface {
-    
+
     /**
      * Connect to the database.
      * @param database
@@ -61,7 +61,6 @@ public interface BooksDbInterface {
      */
     List<Book> getAllBooks() throws BooksDbException;
 
-    List<Author> getAuthorsForBook(int bookId) throws BooksDbException;
     /**
      *
      * adds a new book and trows if exeption if not.
@@ -69,33 +68,20 @@ public interface BooksDbInterface {
      */
     void addBook(Book newItem) throws BooksDbException;
 
-    void clearBookAuthorConnections(int bookId) throws BooksDbException;
-    boolean authorExists(String authorName) throws BooksDbException;
-    int getAuthorId(String authorName) throws BooksDbException;
-    int addAuthorAndGetId(Author author) throws BooksDbException;
     /**
      *updates book with new info and if wrong throws an execption.
      * @throws BooksDbException
      */
     void updateBook(Book updatedItem) throws BooksDbException;
-    void addAuthorsAndConnections(Book book, int bookId, List<Author> authors) throws BooksDbException;
-    int getBookId(String bookTitle) throws BooksDbException;
+
     /**
      *
      * deletes book from list.
      * @throws BooksDbException
      */
     void deleteBook(Book itemToDelete) throws BooksDbException;
-    void clearOrphanAuthors() throws BooksDbException;
-    List<Integer> getAuthorIdsForBook(int bookId) throws BooksDbException;
-    int getMaxAuthorIdInAuthorsTable() throws BooksDbException;
-    void updateAuthorIdsAfterDelete(int deletedAuthorId) throws BooksDbException;
-    void deleteAuthorsIfNeeded (List<Integer> authorIds) throws BooksDbException;
-    void deleteBookFromDatabase (int bookId) throws BooksDbException;
-    void updateBookIdsAfterDelete(int deletedBookId) throws BooksDbException;
-    void deleteAuthorFromDatabase(int authorId) throws BooksDbException;
-    int getMaxBookId() throws BooksDbException;
-    boolean isAuthorConnectedToOtherBooks(int authorId) throws BooksDbException;
+
+    boolean isConnected();
 
 
     // TODO: Add abstract methods for all inserts, deletes and queries 
