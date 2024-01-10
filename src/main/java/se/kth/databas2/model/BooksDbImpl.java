@@ -5,20 +5,26 @@
  */
 package se.kth.databas2.model;
 
-import com.mongodb.ConnectionString;
-import com.mongodb.MongoClientSettings;
-import com.mongodb.MongoException;
-import com.mongodb.ServerApi;
-import com.mongodb.ServerApiVersion;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoClients;
-import com.mongodb.client.MongoDatabase;
+import com.mongodb.*;
+import com.mongodb.client.*;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 import org.bson.Document;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
+import org.bson.conversions.Bson;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.regex.Pattern;
+
+import static com.mongodb.client.model.Accumulators.first;
+import static com.mongodb.client.model.Accumulators.push;
+import static com.mongodb.client.model.Aggregates.*;
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Projections.*;
+import static javax.management.Query.match;
 
 /**
  * A mock implementation of the BooksDBInterface interface to demonstrate how to
@@ -67,69 +73,75 @@ public class BooksDbImpl implements BooksDbInterface {
     public List<Book> searchBooksByTitle(String searchTitle) throws BooksDbException {
         List<Book> result = new ArrayList<>();
         searchTitle = searchTitle.toLowerCase();
+
         try {
-            String sql = "SELECT * FROM Book WHERE title LIKE ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, "%" + searchTitle + "%");
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        int bookId = rs.getInt("bookId");
-                        String title = rs.getString("title");
-                        String isbn = rs.getString("ISBN");
-                        Date publishDate = rs.getDate("publishDate");
-                        Genre genre = Genre.valueOf(rs.getString("genre"));
-                        int rating = rs.getInt("rating");
+            // Use parameterized query to search for books by title
+            Bson regexFilter = Filters.regex("title", Pattern.quote(searchTitle), "i");
 
-                        List<Author> bookAuthors = getAuthorsForBook(bookId);
-                        System.out.println("book ID: " + bookId);
+            FindIterable<Document> bookDocuments = database.getCollection("Book")
+                    .find(regexFilter)
+                    .projection(fields(excludeId()));
 
-                        Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
-                        book.setBookId(bookId);
-                        book.getAuthors().addAll(bookAuthors);
+            for (Document bookDocument : bookDocuments) {
+                int bookId = bookDocument.getInteger("bookId");
+                String title = bookDocument.getString("title");
+                String isbn = bookDocument.getString("ISBN");
+                Date publishDate = bookDocument.getDate("publishDate");
+                Genre genre = Genre.valueOf(bookDocument.getString("genre"));
+                int rating = bookDocument.getInteger("rating");
 
-                        result.add(book);
-                    }
-                }
+                // Fetch authors associated with the book
+                List<Author> bookAuthors = getAuthorsForBook(bookId);
+
+                Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
+                book.setBookId(bookId);
+                book.getAuthors().addAll(bookAuthors);
+
+                result.add(book);
             }
-        }catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error searching books by Title", e);
         }
+
         return result;
     }
+
     @Override
     public List<Book> searchBooksByISBN(String searchISBN) throws BooksDbException {
         List<Book> result = new ArrayList<>();
+
         try {
-            String sql = "SELECT * FROM Book WHERE ISBN LIKE ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, "%" + searchISBN + "%");
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        int bookId = rs.getInt("bookId");
-                        String title = rs.getString("title");
-                        String isbn = rs.getString("ISBN");
-                        Date publishDate = rs.getDate("publishDate");
-                        Genre genre = Genre.valueOf(rs.getString("genre"));
-                        int rating = rs.getInt("rating");
-                        System.out.println("book ID: " + bookId);
+            // Use parameterized query to search for books by ISBN
+            Bson regexFilter = Filters.regex("ISBN", Pattern.quote(searchISBN), "i");
 
-                        // Fetch authors associated with the book
-                        List<Author> bookAuthors = getAuthorsForBook(bookId);
+            FindIterable<Document> bookDocuments = database.getCollection("Book")
+                    .find(regexFilter)
+                    .projection(fields(excludeId()));
 
-                        Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
-                        book.setBookId(bookId);
-                        book.getAuthors().addAll(bookAuthors);
+            for (Document bookDocument : bookDocuments) {
+                int bookId = bookDocument.getInteger("bookId");
+                String title = bookDocument.getString("title");
+                String isbn = bookDocument.getString("ISBN");
+                Date publishDate = bookDocument.getDate("publishDate");
+                Genre genre = Genre.valueOf(bookDocument.getString("genre"));
+                int rating = bookDocument.getInteger("rating");
 
-                        result.add(book);
-                    }
-                }
+                // Fetch authors associated with the book
+                List<Author> bookAuthors = getAuthorsForBook(bookId);
+
+                Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
+                book.setBookId(bookId);
+                book.getAuthors().addAll(bookAuthors);
+
+                result.add(book);
             }
-        } catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error searching books by ISBN", e);
         }
 
         return result;
     }
+
 
 
     @Override
@@ -138,65 +150,91 @@ public class BooksDbImpl implements BooksDbInterface {
         searchAuthor = searchAuthor.toLowerCase();
 
         try {
-            String sql = "SELECT b.* FROM Book b JOIN Book_Author ba ON b.bookId = ba.bookId "
-                    + "JOIN Author a ON a.authorId = ba.authorId WHERE a.authorName LIKE ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, "%" + searchAuthor + "%");
+            // Use parameterized query to search for books by author name
+            String regexPattern = ".*" + Pattern.quote(searchAuthor) + ".*";
+            Bson regexFilter = Filters.regex("authors.authorName", regexPattern, "i");
 
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        int bookId = rs.getInt("bookId");
-                        String title = rs.getString("title");
-                        String isbn = rs.getString("ISBN");
-                        Date publishDate = rs.getDate("publishDate");
-                        Genre genre = Genre.valueOf(rs.getString("genre"));
-                        int rating = rs.getInt("rating");
-                        System.out.println("book ID: " + bookId);
+            FindIterable<Document> bookDocuments = database.getCollection("Book")
+                    .find(regexFilter)
+                    .projection(fields(excludeId()));
 
-                        // Fetch authors associated with the book
-                        List<Author> bookAuthors = getAuthorsForBook(bookId);
+            for (Document bookDocument : bookDocuments) {
+                int bookId = bookDocument.getInteger("bookId");
+                String title = bookDocument.getString("title");
+                String isbn = bookDocument.getString("ISBN");
+                Date publishDate = bookDocument.getDate("publishDate");
+                Genre genre = Genre.valueOf(bookDocument.getString("genre"));
+                int rating = bookDocument.getInteger("rating");
 
-                        Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
-                        book.setBookId(bookId);
-                        book.getAuthors().addAll(bookAuthors);
+                // Fetch authors associated with the book
+                List<Author> bookAuthors = getAuthorsForBook(bookId);
 
-                        result.add(book);
-                    }
-                }
+                Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
+                book.setBookId(bookId);
+                book.getAuthors().addAll(bookAuthors);
+
+                result.add(book);
             }
-        } catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error searching books by author", e);
         }
 
         return result;
     }
 
+
     @Override
     public List<Book> getAllBooks() throws BooksDbException {
         List<Book> result = new ArrayList<>();
         try {
-            String sql = "SELECT * FROM Book";
-            try (Statement stmt = connection.createStatement(); ResultSet rs = stmt.executeQuery(sql)) {
-                while (rs.next()) {
-                    int bookId = rs.getInt("bookId");
-                    String title = rs.getString("title");
-                    String isbn = rs.getString("ISBN");
-                    Date publishDate = rs.getDate("publishDate");
-                    String genreStr = rs.getString("genre");
-                    int rating = rs.getInt("rating");
-                    System.out.println("book ID: " + bookId);
-                    List<Author> bookAuthors = getAuthorsForBook(bookId);
+            // Aggregation to join Book and Book_Author collections
+            List<Bson> pipeline = Arrays.asList(
+                    lookup("Book_Author", "bookId", "bookId", "authors"),
+                    unwind("$authors"),
+                    group("$bookId",
+                            first("title", "$title"),
+                            first("isbn", "$ISBN"),
+                            first("publishDate", "$publishDate"),
+                            first("genre", "$genre"),
+                            first("rating", "$rating"),
+                            push("authors", new Document("authorId", "$authors.authorId").append("authorName", "$authors.authorName"))
+                    ),
+                    project(fields(
+                            excludeId(),
+                            include("title", "isbn", "publishDate", "genre", "rating", "authors")
+                    ))
+            );
 
-                    Genre genre = Genre.valueOf(genreStr);
+            AggregateIterable<Document> aggregationResult = database.getCollection("Book").aggregate(pipeline);
 
-                    Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
-                    book.setBookId(bookId);
-                    book.getAuthors().addAll(bookAuthors);
+            for (Document doc : aggregationResult) {
+                int bookId = doc.getInteger("_id");
+                String title = doc.getString("title");
+                String isbn = doc.getString("isbn");
+                Date publishDate = doc.getDate("publishDate");
+                String genreStr = doc.getString("genre");
+                int rating = doc.getInteger("rating");
 
-                    result.add(book);
+                @SuppressWarnings("unchecked")
+                List<Document> authorsDocs = (List<Document>) doc.get("authors");
+                List<Author> bookAuthors = new ArrayList<>();
+
+                for (Document authorDoc : authorsDocs) {
+                    int authorId = authorDoc.getInteger("authorId");
+                    String authorName = authorDoc.getString("authorName");
+                    Author author = new Author(authorId, authorName);
+                    bookAuthors.add(author);
                 }
+
+                Genre genre = Genre.valueOf(genreStr);
+
+                Book book = new Book(bookId, title, isbn, publishDate, genre, rating);
+                book.setBookId(bookId);
+                book.getAuthors().addAll(bookAuthors);
+
+                result.add(book);
             }
-        } catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error getting all books", e);
         }
         return result;
@@ -205,130 +243,127 @@ public class BooksDbImpl implements BooksDbInterface {
     // A method to retrieve authors for a given book
     @Override
     public List<Author> getAuthorsForBook(int bookId) throws BooksDbException {
-        String sql = "SELECT a.* FROM Author a JOIN Book_Author ba ON a.authorId = ba.authorId WHERE ba.bookId = ?";
         List<Author> authors = new ArrayList<>();
-        try{
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setInt(1, bookId);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    while (rs.next()) {
-                        int authorId = rs.getInt("authorId");
-                        String authorName = rs.getString("authorName");
-                        Author author = new Author(authorId, authorName);
-                        authors.add(author);
-                    }
-                }
+        try {
+            // Aggregation to join Book_Author and Author collections
+            List<Bson> pipeline = Arrays.asList(
+                    match(eq("bookId", bookId)),
+                    lookup("Book_Author", "authorId", "authorId", "authors"),
+                    unwind("$authors"),
+                    replaceRoot("$authors")
+            );
+
+            AggregateIterable<Document> aggregationResult = database.getCollection("Author").aggregate(pipeline);
+
+            for (Document doc : aggregationResult) {
+                int authorId = doc.getInteger("authorId");
+                String authorName = doc.getString("authorName");
+                Author author = new Author(authorId, authorName);
+                authors.add(author);
             }
-        }catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error searching books by Title", e);
         }
         return authors;
     }
 
+
     @Override
     public void addBook(Book book) throws BooksDbException {
         try {
-            try (PreparedStatement statement = connection.prepareStatement("INSERT INTO Book (title, isbn, publishDate, genre, rating) VALUES (?, ?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS)) {
-                statement.setString(1, book.getTitle());
-                statement.setString(2, book.getIsbn());
-                statement.setDate(3, book.getPublishDate());
-                statement.setString(4, book.getGenre().toString());
-                statement.setInt(5, book.getRating());
-                statement.executeUpdate();
+            // Create a document for the new book
+            Document bookDoc = new Document()
+                    .append("title", book.getTitle())
+                    .append("isbn", book.getIsbn())
+                    .append("publishDate", book.getPublishDate())
+                    .append("genre", book.getGenre().toString())
+                    .append("rating", book.getRating());
 
-                try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        int bookId = generatedKeys.getInt(1);
-                        System.out.println("Generated Book ID: " + bookId);
-                        System.out.println("Generated author ID: " + book.getAuthors());
+            // Insert the document into the "Book" collection
+            database.getCollection("Book").insertOne(bookDoc);
 
-                        book.setBookId(bookId);
+            // Retrieve the generated bookId from the inserted document
+            int bookId = bookDoc.getInteger("_id");
 
-                        clearBookAuthorConnections(bookId);
+            System.out.println("Generated Book ID: " + bookId);
+            System.out.println("Generated author ID: " + book.getAuthors());
 
-                        addAuthorsAndConnections(book, book.getBookId(), book.getAuthors());
+            book.setBookId(bookId);
 
-                        connection.commit();
-                    } else {
-                        throw new SQLException("Failed to get generated book ID");
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            try {
-                connection.rollback();
-            } catch (SQLException rollbackException) {
-                throw new BooksDbException("Error rolling back transaction", rollbackException);
-            }
+            // Clear existing author connections for the book
+            clearBookAuthorConnections(bookId);
+
+            // Add authors and connections
+            addAuthorsAndConnections(book, book.getBookId(), book.getAuthors());
+
+            System.out.println("Book added successfully.");
+
+        } catch (MongoException e) {
             throw new BooksDbException("Error adding book: " + e.getMessage(), e);
-        } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException e) {
-                throw new BooksDbException("Error setting auto-commit to true", e);
-            }
         }
     }
+
     @Override
     public void clearBookAuthorConnections(int bookId) throws BooksDbException {
         try {
-            try (PreparedStatement statement = connection.prepareStatement("DELETE FROM Book_Author WHERE bookId = ?")) {
-                statement.setInt(1, bookId);
-                statement.executeUpdate();
-                System.out.println("Cleared existing author connections for book with ID " + bookId);
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+            // Delete author connections for the specified bookId
+            database.getCollection("Book_Author")
+                    .deleteMany(eq("bookId", bookId));
+
+            System.out.println("Cleared existing author connections for book with ID " + bookId);
+        } catch (MongoException e) {
+            throw new BooksDbException("Error clearing author connections: " + e.getMessage(), e);
         }
     }
+
     @Override
     public boolean authorExists(String authorName) throws BooksDbException {
-        String sql = "SELECT * FROM Author WHERE authorName = ?";
-        try{
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, authorName);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    return rs.next();
-                }
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        try {
+            // Check if an author document with the given name exists
+            return database.getCollection("Author")
+                    .find(eq("authorName", authorName))
+                    .limit(1)
+                    .iterator()
+                    .hasNext();
+        } catch (MongoException e) {
+            throw new BooksDbException("Error checking author existence: " + e.getMessage(), e);
         }
     }
+
     @Override
     public int getAuthorId(String authorName) throws BooksDbException {
-        String sql = "SELECT authorId FROM Author WHERE authorName = ?";
-        try{
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, authorName);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getInt("authorId");
-                    } else {
-                        throw new SQLException("Author not found with name: " + authorName);
-                    }
-                }
+        try {
+            // Find the author document with the given name and retrieve the authorId
+            Document authorDocument = database.getCollection("Author")
+                    .find(eq("authorName", authorName))
+                    .projection(fields(include("authorId"), excludeId()))
+                    .limit(1)
+                    .first();
+
+            if (authorDocument != null) {
+                return authorDocument.getInteger("authorId");
+            } else {
+                throw new BooksDbException("Author not found with name: " + authorName);
             }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        } catch (MongoException e) {
+            throw new BooksDbException("Error getting author ID: " + e.getMessage(), e);
         }
     }
+
     @Override
     public int addAuthorAndGetId(Author author) throws BooksDbException {
-        try{
-            try (PreparedStatement authorStatement = connection.prepareStatement("INSERT INTO Author (authorName) VALUES (?)", Statement.RETURN_GENERATED_KEYS)) {
-                authorStatement.setString(1, author.getName());
-                authorStatement.executeUpdate();
-                try (ResultSet generatedKeys = authorStatement.getGeneratedKeys()) {
-                    if (generatedKeys.next()) {
-                        return generatedKeys.getInt(1);
-                    } else {
-                        throw new SQLException("Failed to get generated author ID");
-                    }
-                }
+        try {
+            // Insert a new author document and retrieve the generated authorId
+            Document authorDocument = new Document("authorName", author.getName());
+            database.getCollection("Author").insertOne(authorDocument);
+
+            if (authorDocument.containsKey("_id")) {
+                return authorDocument.getInteger("_id");
+            } else {
+                throw new BooksDbException("Failed to get generated author ID");
             }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        } catch (MongoException e) {
+            throw new BooksDbException("Error adding author and getting ID: " + e.getMessage(), e);
         }
     }
 
@@ -358,27 +393,47 @@ public class BooksDbImpl implements BooksDbInterface {
         }
     }
 
-public void updateBook(Book book) throws BooksDbException {
-    try {
-        connection.setAutoCommit(false);
-        updates(book);
-        updateBookAuthors(book, book.getAuthors());
-        connection.commit();
-    } catch (SQLException e) {
+    public void updateBook(Book book) throws BooksDbException {
         try {
-            connection.rollback();
-        } catch (SQLException rollbackException) {
-            throw new BooksDbException("Error rolling back transaction", rollbackException);
-        }
-        throw new BooksDbException("Error updating book: " + e.getMessage(), e);
-    } finally {
-        try {
-            connection.setAutoCommit(true);
-        } catch (SQLException e) {
-            throw new BooksDbException("Error setting auto-commit to true", e);
+            Bson filter = eq("bookId", book.getBookId());
+
+            // Start a transaction
+            ClientSession session = mongoClient.startSession();
+            session.startTransaction();
+
+            try {
+                // Update the main book information
+                Bson updateBook = Updates.combine(
+                        Updates.set("title", book.getTitle()),
+                        Updates.set("ISBN", book.getIsbn()),
+                        Updates.set("publishDate", book.getPublishDate()),
+                        Updates.set("genre", book.getGenre().toString()),
+                        Updates.set("rating", book.getRating())
+                );
+                UpdateResult bookUpdateResult = database.getCollection("Book").updateOne(session, filter, updateBook);
+
+                if (bookUpdateResult.getModifiedCount() == 0) {
+                    throw new BooksDbException("Failed to update book with ID: " + book.getBookId());
+                }
+
+                // Update the authors
+                updateBookAuthors(book, book.getAuthors(), session);
+
+                // Commit the transaction
+                session.commitTransaction();
+            } catch (Exception e) {
+                // Rollback the transaction if an error occurs
+                session.abortTransaction();
+                throw e;
+            } finally {
+                // Close the session
+                session.close();
+            }
+        } catch (MongoException e) {
+            throw new BooksDbException("Error updating book: " + e.getMessage(), e);
         }
     }
-}
+
     public void updates(Book book) throws BooksDbException {
         updateTitle(book);
         updateIsbn(book);
@@ -390,42 +445,52 @@ public void updateBook(Book book) throws BooksDbException {
     private void updateTitle(Book book) throws BooksDbException {
         try {
             if (book.getTitle() != null && !book.getTitle().isEmpty()) {
-                try (PreparedStatement stmt = connection.prepareStatement("UPDATE Book SET title = ? WHERE bookId = ?")) {
-                    stmt.setString(1, book.getTitle());
-                    stmt.setInt(2, book.getBookId());
-                    stmt.executeUpdate();
+                Bson filter = eq("bookId", book.getBookId());
+                Bson update = Updates.set("title", book.getTitle());
+
+                UpdateResult result = database.getCollection("Book").updateOne(filter, update);
+
+                if (result.getModifiedCount() == 0) {
+                    throw new BooksDbException("Failed to update title for book with ID: " + book.getBookId());
                 }
             }
-        } catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error updating title: " + e.getMessage(), e);
         }
     }
 
     private void updateIsbn(Book book) throws BooksDbException {
         try {
-            System.out.println("bookId: " + book.getBookId());
             if (book.getIsbn() != null && !book.getIsbn().isEmpty()) {
-                try (PreparedStatement stmt = connection.prepareStatement("UPDATE Book SET ISBN = ? WHERE bookId = ?")) {
-                    stmt.setString(1, book.getIsbn());
-                    stmt.setInt(2, book.getBookId());
-                    stmt.executeUpdate();
+                Bson filter = eq("bookId", book.getBookId());
+                Bson update = Updates.set("ISBN", book.getIsbn());
+
+                UpdateResult result = database.getCollection("Book").updateOne(filter, update);
+
+                if (result.getModifiedCount() == 0) {
+                    throw new BooksDbException("Failed to update ISBN for book with ID: " + book.getBookId());
                 }
             }
-        } catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error updating ISBN: " + e.getMessage(), e);
         }
     }
 
+
+
     private void updatePublishDate(Book book) throws BooksDbException {
         try {
             if (book.getPublishDate() != null) {
-                try (PreparedStatement stmt = connection.prepareStatement("UPDATE Book SET publishDate = ? WHERE bookId = ?")) {
-                    stmt.setDate(1, Date.valueOf(String.valueOf(book.getPublishDate())));
-                    stmt.setInt(2, book.getBookId());
-                    stmt.executeUpdate();
+                Bson filter = eq("bookId", book.getBookId());
+                Bson update = Updates.set("publishDate", book.getPublishDate());
+
+                UpdateResult result = database.getCollection("Book").updateOne(filter, update);
+
+                if (result.getModifiedCount() == 0) {
+                    throw new BooksDbException("Failed to update publish date for book with ID: " + book.getBookId());
                 }
             }
-        } catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error updating publish date: " + e.getMessage(), e);
         }
     }
@@ -433,84 +498,92 @@ public void updateBook(Book book) throws BooksDbException {
     private void updateGenre(Book book) throws BooksDbException {
         try {
             if (book.getGenre() != null) {
-                try (PreparedStatement stmt = connection.prepareStatement("UPDATE Book SET genre = ? WHERE bookId = ?")) {
-                    stmt.setString(1, book.getGenre().toString());
-                    stmt.setInt(2, book.getBookId());
-                    stmt.executeUpdate();
+                Bson filter = eq("bookId", book.getBookId());
+                Bson update = Updates.set("genre", book.getGenre().toString());
+
+                UpdateResult result = database.getCollection("Book").updateOne(filter, update);
+
+                if (result.getModifiedCount() == 0) {
+                    throw new BooksDbException("Failed to update genre for book with ID: " + book.getBookId());
                 }
             }
-        } catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error updating genre: " + e.getMessage(), e);
         }
     }
 
+
     private void updateRating(Book book) throws BooksDbException {
         try {
-            try (PreparedStatement stmt = connection.prepareStatement("UPDATE Book SET rating = ? WHERE bookId = ?")) {
-                stmt.setInt(1, book.getRating());
-                stmt.setInt(2, book.getBookId());
-                stmt.executeUpdate();
-            }
-        } catch (SQLException e) {
+            // Find the book by bookId and update the rating
+            database.getCollection("Book")
+                    .updateOne(eq("bookId", book.getBookId()),
+                            Updates.set("rating", book.getRating()));
+        } catch (MongoException e) {
             throw new BooksDbException("Error updating rating: " + e.getMessage(), e);
         }
     }
+
     @Override
     public void addAuthorsAndConnections(Book book, int bookId, List<Author> authors) throws BooksDbException {
-        try{
+        try {
             for (Author author : authors) {
                 int authorId;
                 try {
                     if (authorExists(author.getName())) {
                         authorId = getAuthorId(author.getName());
-                        bookId = getBookId(book.getTitle());
                     } else {
                         authorId = addAuthorAndGetId(author);
-                        bookId = getBookId(book.getTitle());
                     }
-                    if (!isAuthorConnectedToOtherBooks(authorId)) {
-                        try (PreparedStatement innerStatement = connection.prepareStatement("INSERT INTO Book_Author (bookId, authorId) VALUES (?, ?)")) {
-                            innerStatement.setInt(1, bookId);
-                            innerStatement.setInt(2, authorId);
-                            innerStatement.executeUpdate();
 
-                            System.out.println("Added author " + authorId + " for book " + bookId);
-                        }
+                    if (!isAuthorConnectedToOtherBooks(authorId)) {
+                        // Insert a new document into the Book_Author collection
+                        Document document = new Document("bookId", bookId)
+                                .append("authorId", authorId);
+
+                        database.getCollection("Book_Author").insertOne(document);
+
+                        System.out.println("Added author " + authorId + " for book " + bookId);
                     } else {
-                        System.out.println("Author " + authorId + " is already connected to book " + bookId);
+                        System.out.println("Author " + authorId + " is already connected to other books.");
                     }
-                } catch (SQLException e) {
+                } catch (MongoException e) {
                     System.out.println("Error adding author for book " + bookId + ": " + e.getMessage());
                     throw e;
                 }
             }
-        }catch (SQLException e) {
+        } catch (MongoException e) {
             throw new BooksDbException("Error searching books by Title", e);
         }
     }
+
     @Override
     public int getBookId(String bookTitle) throws BooksDbException {
-        try{
-            String sql = "SELECT bookId FROM Book WHERE title = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setString(1, bookTitle);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getInt("bookId");
-                    } else {
-                        throw new SQLException("Book not found with title: " + bookTitle);
-                    }
+        try {
+            // Find the bookId from the Book collection based on the title
+            Document result = database.getCollection("Book")
+                    .find(new Document("title", bookTitle))
+                    .projection(include("bookId"))
+                    .first();
+
+            if (result != null) {
+                Integer bookId = result.getInteger("bookId");
+                if (bookId != null) {
+                    return bookId;
+                } else {
+                    throw new BooksDbException("Book not found with title: " + bookTitle);
                 }
+            } else {
+                throw new BooksDbException("Book not found with title: " + bookTitle);
             }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        } catch (MongoException e) {
+            throw new BooksDbException("Error searching books by Title in Book collection", e);
         }
     }
 
+    @Override
     public void deleteBook(Book book) throws BooksDbException {
         try {
-            connection.setAutoCommit(false);
-
             int deletedBookId = book.getBookId();
 
             clearBookAuthorConnections(deletedBookId);
@@ -525,52 +598,64 @@ public void updateBook(Book book) throws BooksDbException {
 
             deleteAuthorsIfNeeded(authorIds);
 
-            connection.commit();
-        } catch (SQLException e) {
-            try {
-                connection.rollback();
-            } catch (SQLException rollbackException) {
-                throw new BooksDbException("Error rolling back transaction", rollbackException);
-            }
-            throw new BooksDbException("Error deleting book: " + e.getMessage(), e);
-        } finally {
-            try {
-                connection.setAutoCommit(true);
-            } catch (SQLException e) {
-                throw new BooksDbException("Error setting auto-commit to true", e);
-            }
+        } catch (BooksDbException e) {
+            throw e; // Re-throw the exception to propagate it to the caller
         }
     }
+
     @Override
     public void clearOrphanAuthors() throws BooksDbException {
-        try{
-            String sql = "DELETE FROM Author WHERE authorId NOT IN (SELECT DISTINCT authorId FROM Book_Author)";
-            try (Statement statement = connection.createStatement()) {
-                statement.executeUpdate(sql);
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        try {
+            // Delete authors that are not associated with any books
+            database.getCollection("Author").deleteMany(
+                    new Document("authorId", new Document("$nin", getDistinctAuthorIds()))
+            );
+        } catch (MongoException e) {
+            throw new BooksDbException("Error clearing orphan authors", e);
         }
     }
+
     @Override
     public List<Integer> getAuthorIdsForBook(int bookId) throws BooksDbException {
         List<Integer> authorIds = new ArrayList<>();
-        try{
-            try (PreparedStatement statement = connection.prepareStatement("SELECT authorId FROM Book_Author WHERE bookId = ?")) {
-                statement.setInt(1, bookId);
+        try {
+            // Find authors associated with the given book
+            MongoCursor<Document> cursor = database.getCollection("Book_Author")
+                    .find(new Document("bookId", bookId))
+                    .iterator();
 
-                try (ResultSet resultSet = statement.executeQuery()) {
-                    while (resultSet.next()) {
-                        int authorId = resultSet.getInt("authorId");
-                        authorIds.add(authorId);
-                    }
-                }
+            while (cursor.hasNext()) {
+                Document document = cursor.next();
+                int authorId = document.getInteger("authorId");
+                authorIds.add(authorId);
             }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+
+            cursor.close();
+        } catch (MongoException e) {
+            throw new BooksDbException("Error getting author IDs for book", e);
         }
         return authorIds;
     }
+
+    // Helper method to get distinct author IDs from Book_Author collection
+    private List<Integer> getDistinctAuthorIds() throws BooksDbException {
+        List<Integer> distinctAuthorIds = new ArrayList<>();
+        try {
+            MongoCursor<Document> cursor = database.getCollection("Book_Author")
+                    .distinct("authorId", Integer.class)
+                    .iterator();
+
+            while (cursor.hasNext()) {
+                distinctAuthorIds.add(cursor.next());
+            }
+
+            cursor.close();
+        } catch (MongoException e) {
+            throw new BooksDbException("Error getting distinct author IDs", e);
+        }
+        return distinctAuthorIds;
+    }
+
     /*
     private void resetAuthorIdSequence() throws SQLException {
         int maxAuthorId = getMaxAuthorIdInAuthorsTable();
@@ -582,30 +667,37 @@ public void updateBook(Book book) throws BooksDbException {
     }*/
     @Override
     public int getMaxAuthorIdInAuthorsTable() throws BooksDbException {
-        try{
-            String sql = "SELECT MAX(authorId) FROM Author";
-            try (Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(sql)) {
-                if (resultSet.next()) {
-                    return resultSet.getInt(1) + 1;
-                } else {
-                    return 1;
-                }
+        try {
+            // Find the maximum authorId in the Author collection
+            MongoCursor<Document> cursor = database.getCollection("Author")
+                    .find()
+                    .sort(new BasicDBObject("authorId", -1))
+                    .limit(1)
+                    .iterator();
+
+            if (cursor.hasNext()) {
+                return cursor.next().getInteger("authorId") + 1;
+            } else {
+                return 1;
             }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        } catch (MongoException e) {
+            throw new BooksDbException("Error getting max author ID in Author collection", e);
         }
     }
+
     @Override
     public void updateAuthorIdsAfterDelete(int deletedAuthorId) throws BooksDbException {
-        try{
-            try (PreparedStatement updateStatement = connection.prepareStatement("UPDATE Author SET authorId = authorId - 1 WHERE authorId = ?")) {
-                updateStatement.setInt(1, deletedAuthorId);
-                updateStatement.executeUpdate();
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        try {
+            // Update authorIds after deleting an author
+            database.getCollection("Author").updateMany(
+                    new Document("authorId", new Document("$gt", deletedAuthorId)),
+                    new Document("$inc", new Document("authorId", -1))
+            );
+        } catch (MongoException e) {
+            throw new BooksDbException("Error updating author IDs after delete", e);
         }
     }
+
     @Override
     public void deleteAuthorsIfNeeded(List<Integer> authorIds) throws BooksDbException {
         for (Integer authorId : authorIds) {
@@ -617,29 +709,31 @@ public void updateBook(Book book) throws BooksDbException {
             }
         }
     }
+
     @Override
     public void deleteBookFromDatabase(int bookId) throws BooksDbException {
-        try{
-            try (PreparedStatement statement = connection.prepareStatement("DELETE FROM Book WHERE bookId = ?")) {
-                statement.setInt(1, bookId);
-                statement.executeUpdate();
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        try {
+            // Delete the book with the specified bookId from the Book collection
+            database.getCollection("Book").deleteOne(new Document("bookId", bookId));
+        } catch (MongoException e) {
+            throw new BooksDbException("Error deleting book from Book collection", e);
         }
     }
+
     @Override
     public void updateBookIdsAfterDelete(int deletedBookId) throws BooksDbException {
-        try{
-            try (PreparedStatement updateStatement = connection.prepareStatement("UPDATE Book SET bookId = bookId - 1 WHERE bookId = ?")) {
-                updateStatement.setInt(1, deletedBookId);
-                updateStatement.executeUpdate();
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        try {
+            // Update bookIds after deleting a book
+            database.getCollection("Book").updateMany(
+                    new Document("bookId", new Document("$gt", deletedBookId)),
+                    new Document("$inc", new Document("bookId", -1))
+            );
+        } catch (MongoException e) {
+            throw new BooksDbException("Error updating book IDs after delete", e);
         }
     }
-/*
+
+    /*
     private void resetBookIdSequence() throws SQLException {
         try (PreparedStatement resetSequence = connection.prepareStatement("ALTER TABLE Book AUTO_INCREMENT = ?")) {
             resetSequence.setInt(1, getMaxBookId());
@@ -648,45 +742,61 @@ public void updateBook(Book book) throws BooksDbException {
     }*/
     @Override
     public void deleteAuthorFromDatabase(int authorId) throws BooksDbException {
-        try{
-            try (PreparedStatement statement = connection.prepareStatement("DELETE FROM Author WHERE authorId = ?")) {
-                statement.setInt(1, authorId);
-                statement.executeUpdate();
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        try {
+            // Delete the author with the specified authorId from the Author collection
+            database.getCollection("Author").deleteOne(new Document("authorId", authorId));
+        } catch (MongoException e) {
+            throw new BooksDbException("Error deleting author from Author collection", e);
         }
     }
+
     @Override
     public int getMaxBookId() throws BooksDbException {
-        try{
-            String sql = "SELECT MAX(bookId) FROM Book";
-            try (Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(sql)) {
-                if (resultSet.next()) {
-                    return resultSet.getInt(1) + 1;
-                } else {
-                    return 1;
+        try {
+            // Find the maximum bookId from the Book collection
+            Document result = database.getCollection("Book")
+                    .aggregate(Collections.singletonList(
+                            new Document("$group", new Document("_id", null)
+                                    .append("maxBookId", new Document("$max", "$bookId"))
+                            )
+                    ))
+                    .first();
+
+            if (result != null) {
+                Object maxBookId = result.get("maxBookId");
+                if (maxBookId instanceof Number) {
+                    return ((Number) maxBookId).intValue() + 1;
                 }
             }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+
+            return 1;
+        } catch (MongoException e) {
+            throw new BooksDbException("Error getting max bookId from Book collection", e);
         }
     }
+
     @Override
     public boolean isAuthorConnectedToOtherBooks(int authorId) throws BooksDbException {
-        try{
-            String sql = "SELECT COUNT(*) FROM Book_Author WHERE authorId = ?";
-            try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                pstmt.setInt(1, authorId);
-                try (ResultSet rs = pstmt.executeQuery()) {
-                    if (rs.next()) {
-                        return rs.getInt(1) > 0;
-                    }
-                }
-            }
-        }catch (SQLException e) {
-            throw new BooksDbException("Error searching books by Title", e);
+        try {
+            // Check if the author is connected to other books in the Book_Author collection
+            return database.getCollection("Book_Author")
+                    .countDocuments(new Document("authorId", authorId)) > 0;
+        } catch (MongoException e) {
+            throw new BooksDbException("Error checking author connections in Book_Author collection", e);
         }
-        return false;
     }
+
+
+    @Override
+    public boolean isConnected() {
+        try {
+            return mongoClient != null && mongoClient.getCluster().isConnected();
+        } catch (Exception e) {
+            // Handle the exception or log it
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
 }
