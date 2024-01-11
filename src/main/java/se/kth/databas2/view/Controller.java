@@ -62,12 +62,13 @@ public class Controller {
 
     public void connectToDatabase() {
         try {
-            if (booksDb.connect("kcdb2")) {
+            if (booksDb.connect("kcdb")) {
                 booksView.showAlertAndWait("Connected to the database.", INFORMATION);
             } else {
                 booksView.showAlertAndWait("Failed to connect to the database.", WARNING);
             }
         } catch (Exception e) {
+            e.printStackTrace();
             booksView.showAlertAndWait("Error connecting to the database: " + e.getMessage(), ERROR);
         }
     }

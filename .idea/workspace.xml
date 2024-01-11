@@ -4,13 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="77065e23-7972-42ab-b46f-aa5df5945702" name="Changes" comment="databas2*">
+    <list default="true" id="77065e23-7972-42ab-b46f-aa5df5945702" name="Changes" comment="databas2* diverse">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/pom.xml" beforeDir="false" afterPath="$PROJECT_DIR$/pom.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/se/kth/databas2/model/Book.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/se/kth/databas2/model/Book.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/module-info.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/module-info.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/se/kth/databas2/model/BooksDbImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/se/kth/databas2/model/BooksDbImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/se/kth/databas2/model/BooksDbInterface.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/se/kth/databas2/model/BooksDbInterface.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/se/kth/databas2/view/Dialogs.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/se/kth/databas2/view/Dialogs.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/se/kth/databas2/view/Controller.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/se/kth/databas2/view/Controller.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -118,7 +117,14 @@
       <option name="presentableId" value="LOCAL−00003" />
       <updated>1704924412971</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL−00004" summary="databas2* diverse">
+      <option name="closed" value="true" />
+      <created>1704977565904</created>
+      <option name="number" value="LOCAL−00004" />
+      <option name="presentableId" value="LOCAL−00004" />
+      <updated>1704977565904</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -134,6 +140,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="databas2*" />
-    <option name="LAST_COMMIT_MESSAGE" value="databas2*" />
+    <MESSAGE value="databas2* diverse" />
+    <option name="LAST_COMMIT_MESSAGE" value="databas2* diverse" />
   </component>
 </project>

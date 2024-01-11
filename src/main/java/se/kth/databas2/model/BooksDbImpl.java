@@ -1,20 +1,17 @@
 package se.kth.databas2.model;
 
-import com.mongodb.MongoClientSettings;
-import com.mongodb.MongoException;
+import com.mongodb.*;
 import com.mongodb.client.*;
+import com.mongodb.client.MongoClient;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 import org.bson.Document;
-import org.bson.codecs.configuration.CodecRegistry;
-import org.bson.codecs.pojo.PojoCodecProvider;
 import org.bson.conversions.Bson;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -38,27 +35,25 @@ public class BooksDbImpl implements BooksDbInterface {
     @Override
     public boolean connect(String databaseName) throws BooksDbException {
         try {
-            mongoClient = MongoClients.create("mongodb+srv://kallestenbjelke:Gaming123@kcdb2.gt7n66h.mongodb.net/?retryWrites=true&w=majority");
-
-            // Lägg till stöd för POJO-mappning
-            CodecRegistry pojoCodecRegistry = org.bson.codecs.configuration.CodecRegistries.fromRegistries(
-                    MongoClientSettings.getDefaultCodecRegistry(),
-                    org.bson.codecs.configuration.CodecRegistries.fromProviders(PojoCodecProvider.builder().automatic(true).build())
-            );
-
+            String connectionString = "mongodb+srv://kallestenbjelke:Gaming123@kcdb.gt7n66h.mongodb.net/";
+            ConnectionString connString = new ConnectionString(connectionString);
             MongoClientSettings settings = MongoClientSettings.builder()
-                    .codecRegistry(pojoCodecRegistry)
+                    .applyConnectionString(connString)
                     .build();
 
-            database = mongoClient.getDatabase(databaseName).withCodecRegistry(pojoCodecRegistry);
+            this.mongoClient = MongoClients.create(settings);
+            this.database = this.mongoClient.getDatabase(databaseName);
 
-            System.out.println("Connected to MongoDb");
+            Document pingCommand = new Document("ping", 1);
+            this.database.runCommand(pingCommand);
+
+            System.out.println("Pinged your deployment. You successfully connected to MongoDB!");
             return true;
         } catch (MongoException e) {
+            e.printStackTrace();
             throw new BooksDbException("Could not connect to MongoDB", e);
         }
     }
-
     @Override
     public void disconnect() throws BooksDbException {
         try {
@@ -71,32 +66,62 @@ public class BooksDbImpl implements BooksDbInterface {
         }
     }
 
-    @Override
-    public List<Book> searchBooksByTitle(String searchTitle) throws BooksDbException {
-        List<Book> result = new ArrayList<>();
-        searchTitle = searchTitle.toLowerCase();
+    private Book documentToBook(Document document) {
+        int bookId = (document.getInteger("bookId") != null) ? document.getInteger("bookId").intValue() : 0;
+        String title = document.getString("title");
+        String isbn = document.getString("ISBN");
+        LocalDate publishDate = document.getDate("publishDate").toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        Genre genre = Genre.valueOf(document.getString("genre"));
+        int rating = document.getInteger("rating");
 
-        try {
-            Bson regexFilter = Filters.regex("title", Pattern.quote(searchTitle), "i");
+        List<Document> authorDocuments = (List<Document>) document.get("authors");
+        List<Author> authors = new ArrayList<>();
 
-            FindIterable<Book> bookDocuments = database.getCollection("Book", Book.class)
-                    .find(regexFilter)
-                    .projection(fields(excludeId()));
-
-            for (Book book : bookDocuments) {
-                result.add(book);
+        if (authorDocuments != null) {
+            for (Document authorDocument : authorDocuments) {
+                int authorId = (authorDocument.getInteger("authorId") != null) ? authorDocument.getInteger("authorId").intValue() : 0;
+                String authorName = authorDocument.getString("name");
+                Author author = new Author(authorId, authorName);
+                authors.add(author);
             }
-        } catch (MongoException e) {
-            throw new BooksDbException("Error searching book by title", e);
         }
 
-        return result;
+        return new Book(bookId, title, isbn, publishDate, genre, rating, authors);
+    }
+
+
+    @Override
+    public List<Book> searchBooksByTitle(String searchTitle) throws BooksDbException {
+        if (this.database == null) {
+            throw new BooksDbException("Database connection is null. Make sure to connect before performing queries.");
+        }
+
+        List<Book> books = new ArrayList<>();
+        searchTitle = searchTitle.toLowerCase();
+        FindIterable<Document> result = null;
+        MongoCursor<Document> iterator = null;
+
+        try {
+            MongoCollection<Document> bookCollection = this.database.getCollection("Book");
+            result = bookCollection.find(eq("title", searchTitle));
+            iterator = result.iterator();
+            while (iterator.hasNext()) {
+                Document book = iterator.next();
+                books.add(documentToBook(book));
+            }
+            return books;
+        } catch (MongoException e) {
+            throw new BooksDbException("Error searching by title", e);
+        } finally {
+            if (iterator != null) {
+                iterator.close();
+            }
+        }
     }
 
     @Override
     public List<Book> searchBooksByISBN(String searchISBN) throws BooksDbException {
         List<Book> result = new ArrayList<>();
-
         try {
             Bson regexFilter = Filters.regex("ISBN", Pattern.quote(searchISBN), "i");
 
@@ -120,18 +145,15 @@ public class BooksDbImpl implements BooksDbInterface {
 
         try {
             Bson regexFilter = Filters.regex("authors.name", Pattern.quote(author), "i");
-
             FindIterable<Book> bookDocuments = database.getCollection("Book", Book.class)
                     .find(regexFilter)
                     .projection(fields(excludeId()));
-
             for (Book book : bookDocuments) {
                 result.add(book);
             }
         } catch (MongoException e) {
             throw new BooksDbException("Error searching book by author", e);
         }
-
         return result;
     }
 
@@ -142,14 +164,12 @@ public class BooksDbImpl implements BooksDbInterface {
             FindIterable<Book> bookDocuments = database.getCollection("Book", Book.class)
                     .find()
                     .projection(fields(excludeId()));
-
             for (Book book : bookDocuments) {
                 result.add(book);
             }
         } catch (MongoException e) {
             throw new BooksDbException("Error searching for all books", e);
         }
-
         return result;
     }
 
@@ -167,7 +187,6 @@ public class BooksDbImpl implements BooksDbInterface {
     @Override
     public void updateBook(Book updatedItem) throws BooksDbException {
         try {
-            // Uppdatera boken i "Book"-samlingen
             Bson filter = eq("bookId", updatedItem.getBookId());
             Bson update = Updates.combine(
                     Updates.set("title", updatedItem.getTitle()),
@@ -196,7 +215,6 @@ public class BooksDbImpl implements BooksDbInterface {
         try {
             Bson filter = eq("bookId", itemToDelete.getBookId());
             database.getCollection("Book", Book.class).deleteOne(filter);
-
             System.out.println("Deleted book with ID: " + itemToDelete.getBookId());
         } catch (MongoException e) {
             System.out.println("Error deleting book: " + e.getMessage());
