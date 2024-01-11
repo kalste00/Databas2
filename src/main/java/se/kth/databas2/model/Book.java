@@ -1,5 +1,7 @@
 package se.kth.databas2.model;
 
+import org.bson.Document;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
@@ -10,7 +12,7 @@ import java.util.List;
  *
  * @author anderslm@kth.se
  */
-public class Book {
+public class Book extends Document {
 
     private int bookId;
     private String isbn;
