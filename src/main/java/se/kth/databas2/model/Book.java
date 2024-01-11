@@ -21,17 +21,19 @@ public class Book {
     private String storyLine = "";
     private List<Author> authors = new ArrayList<>();
 
-    public Book(int bookId, String title, String isbn, LocalDate publishDate, Genre genre, int rating) {
+    public Book(int bookId, String title, String isbn, LocalDate publishDate, Genre genre, int rating, List<Author> authors) {
         this.bookId = bookId;
         this.title = title;
         this.isbn = isbn;
         this.publishDate = publishDate;
         this.genre = genre;
         this.rating = rating;
+        this.authors = authors;
     }
 
-    public Book(String title, String isbn, LocalDate publishDate, Genre genre, int rating) {
-        this(-1, title, isbn, publishDate, genre, rating);
+
+    public Book(String title, String isbn, LocalDate publishDate, Genre genre, int rating, List<Author> authors) {
+        this(-1, title, isbn, publishDate, genre, rating, authors);
     }
 
     public int getBookId() { return bookId; }

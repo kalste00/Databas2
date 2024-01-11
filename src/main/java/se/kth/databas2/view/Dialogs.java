@@ -94,7 +94,6 @@ public class Dialogs {
 
         dialog.getDialogPane().setContent(grid);
 
-        // Convert the result to a Book object when the add button is clicked
         dialog.setResultConverter(buttonType -> {
             if (buttonType == addButton) {
                 try {
@@ -103,9 +102,10 @@ public class Dialogs {
                     LocalDate publishedDate = publishedDateField.getValue();
                     int rating = ratingField.getText().isEmpty() ? 0 : Integer.parseInt(ratingField.getText());
                     Genre selectedGenre = genreChoiceBox.getValue();
+                    List<Author> authors = new ArrayList<>();
+                    selectedAuthors.forEach(author -> authors.add(new Author(author)));
 
-                    Book book = new Book(title, isbn, publishedDate, selectedGenre, rating);
-                    selectedAuthors.forEach(author -> book.addAuthor(new Author(author)));
+                    Book book = new Book(title, isbn, publishedDate, selectedGenre, rating, authors);
                     return book;
                 } catch (NumberFormatException e) {
                     showAlert("Invalid rating. Please enter a valid integer.", Alert.AlertType.ERROR);
@@ -205,7 +205,7 @@ public class Dialogs {
                     // Set the new ISBN value in the existing book before returning it
                     book.setIsbn(isbn);
 
-                    Book updatedBook = new Book(book.getBookId(), title, isbn, publishedDate, selectedGenre, rating);
+                    Book updatedBook = new Book(book.getBookId(), title, isbn, publishedDate, selectedGenre, rating, authors);
                     selectedAuthors.forEach(author -> updatedBook.addAuthor(new Author(author)));
                     return updatedBook;
                 } catch (NumberFormatException e) {
